@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Listening History Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{--bg:#eeedf6;--card:#fff;--ink:#17143a;--mute:#66648a;--line:#d9d6ec;--acc:#3a35e8;--soft:#dcdaff;--on:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0d1f;--card:#17152e;--ink:#eceaff;--mute:#9795bd;--line:#2a2750;--acc:#8c88ff;--soft:#2b2870;--on:#0e0d1f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e0d1f;--card:#17152e;--ink:#eceaff;--mute:#9795bd;--line:#2a2750;--acc:#8c88ff;--soft:#2b2870;--on:#0e0d1f;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 48px;display:grid;gap:14px}
+h1,h2,.big{font-family:"Bricolage Grotesque",system-ui,sans-serif}
+h1{font-size:clamp(2.2rem,8vw,3.8rem);line-height:1;margin:12px 0 4px;font-weight:800;letter-spacing:-.03em}
+h2{font-size:1.15rem;margin:0 0 12px;font-weight:800}
+.sub{margin:0;color:var(--mute);max-width:60ch}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.drop label{display:grid;gap:4px;cursor:pointer;text-align:center;padding:18px;border:2px dashed var(--line);border-radius:10px}
+.drop.over label,.drop label:hover{border-color:var(--acc);background:var(--soft)}
+.drop b{color:var(--acc);font-size:1.05rem}
+.drop span,#st{color:var(--mute);font-size:.9rem}
+#st{margin:10px 0 0;text-align:center}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}
+.ctl label{display:grid;gap:4px;font-size:.85rem;color:var(--mute)}
+select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 8px;width:100%}
+.chk{grid-auto-flow:column;justify-content:start;align-items:center;gap:8px!important;padding-bottom:10px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.sum div{padding:2px 0 2px 12px;border-left:3px solid var(--acc)}
+.sum .big{font-size:1.8rem;font-weight:800;line-height:1.1;letter-spacing:-.02em}
+.sum small,.v small,.nm small{display:block;color:var(--mute);font-size:.85rem}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.hero .card{background:var(--acc);color:var(--on);border:0}
+.hero small{opacity:.8}
+.hero .big{font-size:1.5rem;font-weight:800;line-height:1.15;margin:4px 0;overflow-wrap:anywhere}
+.chart{display:flex;gap:6px;height:220px;overflow-x:auto;padding-bottom:2px}
+.bar{all:unset;box-sizing:border-box;flex:1 0 34px;display:flex;flex-direction:column;align-items:center;text-align:center;font-size:.75rem;color:var(--mute)}
+.bar b{font-weight:500;height:1.2em;color:var(--ink)}
+.dense .bar b{display:none}
+.bar .t{flex:1;width:100%;display:flex;align-items:flex-end}
+.bar i{display:block;width:100%;background:var(--acc);border-radius:5px 5px 0 0;min-height:2px;opacity:.85}
+.bar span{height:1.4em;padding-top:4px}
+.go{cursor:pointer}.go:hover i{opacity:1}
+.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.tabs button{font:inherit;font-weight:600;padding:7px 14px;border-radius:99px;border:1px solid var(--line);background:none;color:var(--ink);cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--acc);color:var(--on);border-color:var(--acc)}
+ol{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+li{display:grid;grid-template-columns:2rem 1fr auto;gap:8px;align-items:start}
+.r{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;color:var(--mute)}
+.nm b{overflow-wrap:anywhere}
+.nm .k{height:5px;background:var(--soft);border-radius:3px;margin-top:5px}
+.nm .k i{display:block;height:100%;background:var(--acc);border-radius:3px}
+.v{text-align:right;font-weight:600;white-space:nowrap}
+button:focus-visible,select:focus-visible,label:focus-within{outline:2px solid var(--acc);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Listening history</h1><p class="sub">See what you played most, and how long you listened, for every year and month of your Spotify history.</p></header>
+
+<section class="card drop" id="up">
+<label><input id="file" type="file" multiple accept=".zip,.json" hidden><b>Choose your zip or JSON files</b><span>Or drop them here. Files are read in your browser and never uploaded.</span></label>
+<p id="st" role="status"></p>
+</section>
+
+<div id="app" hidden style="display:grid;gap:14px">
+<section class="card ctl">
+<label>Year<select id="yr"></select></label>
+<label>Month<select id="mo"></select></label>
+<label>Content<select id="ct"><option value="m">Music</option><option value="p">Podcasts &amp; video</option><option value="a">Everything</option></select></label>
+<label>Rank by<select id="by"><option value="ms">Time listened</option><option value="pl">Play count</option></select></label>
+<label>Show top<select id="n"><option>5</option><option selected>10</option><option>25</option></select></label>
+<label class="chk"><input type="checkbox" id="sk">Ignore plays under 30 s</label>
+</section>
+<section class="sum" id="sum"></section>
+<section class="hero" id="hero"></section>
+<section class="card"><h2 id="ch"></h2><div class="chart" id="chart"></div></section>
+<section class="card"><div class="tabs" id="tabs"></div><ol id="list"></ol></section>
+</div>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const R={y:[],m:[],d:[],ms:[],k:[],t:[],a:[],l:[]},N={t:[],a:[],l:[]},M={t:new Map,a:new Map,l:new Map},seen=new Set;
+let tab='t',files=0;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const H=ms=>{const mi=Math.round(ms/6e4);return ms/36e5>=100?Math.round(ms/36e5).toLocaleString()+' h':mi>=60?Math.floor(mi/60)+' h '+mi%60+' m':mi+' min'};
+const id=(c,k,v)=>{let i=M[c].get(k);if(i===undefined){i=N[c].length;M[c].set(k,i);N[c].push(v)}return i};
+
+function add(arr){
+  for(const e of arr){
+    if(!e.ts)continue;
+    const tn=e.master_metadata_track_name;let k=0,ar,al=null,ti;
+    if(tn){ar=e.master_metadata_album_artist_name||'Unknown artist';al=e.master_metadata_album_album_name||'Unknown album';ti=[tn,ar]}
+    else if(e.episode_name){k=1;ar=e.episode_show_name||'Unknown show';ti=[e.episode_name,ar]}
+    else continue;
+    const s=e.ts+(e.spotify_track_uri||e.spotify_episode_uri||ti[0]);
+    if(seen.has(s))continue;seen.add(s);
+    const d=new Date(e.ts);
+    R.y.push(d.getFullYear());R.m.push(d.getMonth());R.d.push(d.getDate());R.ms.push(e.ms_played||0);R.k.push(k);
+    R.t.push(id('t',ti[0]+'\u0001'+ar+k,ti));
+    R.a.push(id('a',ar+'\u0001'+k,[ar,k?'Show':'']));
+    R.l.push(al?id('l',al+'\u0001'+ar,[al,ar]):-1);
+  }
+}
+
+async function load(list){
+  const st=$('#st'),re=/Streaming_History_(Audio|Video).*\.json$/i;
+  try{
+    for(const f of list){
+      st.textContent='Reading '+f.name+'…';
+      await new Promise(r=>setTimeout(r));
+      if(/\.zip$/i.test(f.name)){
+        if(typeof JSZip==='undefined'){st.textContent='The zip reader did not load. Try the JSON files instead.';return}
+        const z=await JSZip.loadAsync(f);
+        for(const p in z.files)if(re.test(p)){add(JSON.parse(await z.files[p].async('string')));files++}
+      }else if(re.test(f.name)){add(JSON.parse(await f.text()));files++}
+    }
+  }catch(e){st.textContent='Could not read a file: '+e.message;return}
+  if(!R.y.length){st.textContent='No listening records found. Choose the zip, or the Streaming_History_Audio JSON files.';return}
+  const ys=[...new Set(R.y)].sort((a,b)=>a-b),cur=$('#yr').value||'0';
+  $('#yr').innerHTML='<option value="0">All time</option>'+ys.map(y=>`<option>${y}</option>`).join('');
+  $('#yr').value=ys.includes(+cur)?cur:'0';
+  st.textContent=`Loaded ${R.y.length.toLocaleString()} plays from ${files} files (${ys[0]}–${ys[ys.length-1]}). Add more files any time.`;
+  $('#app').hidden=false;render();
+}
+
+function render(){
+  const y=+$('#yr').value,m=$('#mo').value,c=$('#ct').value,pl=$('#by').value==='pl',n=+$('#n').value,min=$('#sk').checked?3e4:0;
+  const S={},C={};for(const x in N){S[x]=new Float64Array(N[x].length);C[x]=new Uint32Array(N[x].length)}
+  let tot=0,cnt=0;const B=new Map(),len=R.y.length;
+  for(let i=0;i<len;i++){
+    const ms=R.ms[i];
+    if(ms<min||(y&&R.y[i]!==y)||(m!==''&&R.m[i]!==+m)||(c==='m'&&R.k[i])||(c==='p'&&!R.k[i]))continue;
+    tot+=ms;cnt++;
+    for(const x of ['t','a','l']){const j=R[x][i];if(j>=0){S[x][j]+=ms;C[x][j]++}}
+    const b=y?(m===''?R.m[i]:R.d[i]):R.y[i];B.set(b,(B.get(b)||0)+ms);
+  }
+  const top=x=>{const o=[];for(let i=0;i<S[x].length;i++)if(C[x][i])o.push(i);
+    return o.sort((p,q)=>pl?C[x][q]-C[x][p]||S[x][q]-S[x][p]:S[x][q]-S[x][p])};
+  const T={t:top('t'),a:top('a'),l:top('l')};
+  const one={m:['Song','Album','Artist'],p:['Episode','','Show'],a:['Song or episode','Album','Artist or show']}[c];
+  const many={m:['Songs','Albums','Artists'],p:['Episodes','','Shows'],a:['Songs & episodes','Albums','Artists & shows']}[c];
+  const when=(m!==''?MN[+m]+' ':'')+(y||(m!==''?'(all years)':'all time'));
+
+  $('#sum').innerHTML=[
+    [H(tot),'Time listened'+(tot>=864e5?` (${(tot/864e5).toFixed(1)} days)`:'')],
+    [cnt.toLocaleString(),'Plays'],
+    [T.t.length.toLocaleString(),'Different '+many[0].toLowerCase()],
+    [T.a.length.toLocaleString(),'Different '+many[2].toLowerCase()]
+  ].map(a=>`<div><div class="big">${a[0]}</div><small>${a[1]}</small></div>`).join('');
+
+  $('#hero').innerHTML=['t','l','a'].map((x,i)=>{
+    if(x==='l'&&c==='p')return'';
+    const j=T[x][0],lab='Top '+one[x==='t'?0:x==='l'?1:2].toLowerCase()+', '+when;
+    return j===undefined?`<div class="card"><small>${esc(lab)}</small><div class="big">No plays</div></div>`:
+    `<div class="card"><small>${esc(lab)}</small><div class="big">${esc(N[x][j][0])}</div><small>${esc(N[x][j][1])}${N[x][j][1]?' · ':''}${H(S[x][j])} · ${C[x][j].toLocaleString()} plays</small></div>`}).join('');
+
+  let keys,mode;
+  if(!y){const ys=[...new Set(R.y)].sort((a,b)=>a-b);keys=[];for(let v=ys[0];v<=ys[ys.length-1];v++)keys.push(v);mode='y'}
+  else if(m===''){keys=[...Array(12).keys()];mode='m'}
+  else{keys=[...Array(new Date(y,+m+1,0).getDate()).keys()].map(v=>v+1);mode='d'}
+  const mx=Math.max(1,...keys.map(k=>B.get(k)||0));
+  $('#ch').textContent='Time listened by '+{y:'year',m:'month',d:'day'}[mode]+(mode==='y'?(m!==''?' ('+MN[+m]+' only)':''):' in '+(mode==='m'?y:MN[+m]+' '+y));
+  const ch=$('#chart');ch.className='chart'+(keys.length>16?' dense':'');
+  ch.innerHTML=keys.map(k=>{const v=B.get(k)||0,lb=mode==='m'?MN[k].slice(0,3):k;
+    return`<button class="bar${mode==='d'?'':' go'}" data-k="${k}" title="${mode==='m'?MN[k]:lb}: ${H(v)}"><b>${v?Math.round(v/36e5)+'h':''}</b><div class="t"><i style="height:${v/mx*100}%"></i></div><span>${lb}</span></button>`}).join('');
+  ch.onclick=e=>{const b=e.target.closest('.bar');if(!b||mode==='d')return;
+    $(mode==='y'?'#yr':'#mo').value=b.dataset.k;render();$('#ch').scrollIntoView({behavior:'smooth'})};
+
+  if(c==='p'&&tab==='l')tab='t';
+  $('#tabs').innerHTML=['t','l','a'].filter(x=>!(x==='l'&&c==='p')).map(x=>`<button aria-pressed="${tab===x}" data-x="${x}">${esc(many[x==='t'?0:x==='l'?1:2])}</button>`).join('');
+  $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b){tab=b.dataset.x;render()}};
+  const o=T[tab].slice(0,n),first=o[0],ref=first===undefined?1:(pl?C[tab][first]:S[tab][first])||1;
+  $('#list').innerHTML=o.length?o.map((j,i)=>{const sc=pl?C[tab][j]:S[tab][j];
+    return`<li><span class="r">${i+1}</span><div class="nm"><b>${esc(N[tab][j][0])}</b>${N[tab][j][1]?`<small>${esc(N[tab][j][1])}</small>`:''}<div class="k"><i style="width:${sc/ref*100}%"></i></div></div><div class="v">${pl?C[tab][j].toLocaleString()+' plays':H(S[tab][j])}<small>${pl?H(S[tab][j]):C[tab][j].toLocaleString()+' plays'}</small></div></li>`}).join(''):'<li>No plays for this selection.</li>';
+}
+
+$('#mo').innerHTML='<option value="">All months</option>'+MN.map((x,i)=>`<option value="${i}">${x}</option>`).join('');
+for(const s of ['#yr','#mo','#ct','#by','#n','#sk'])$(s).addEventListener('change',render);
+$('#file').addEventListener('change',e=>{load([...e.target.files]);e.target.value=''});
+const up=$('#up');
+['dragenter','dragover'].forEach(t=>up.addEventListener(t,e=>{e.preventDefault();up.classList.add('over')}));
+['dragleave','drop'].forEach(t=>up.addEventListener(t,e=>{e.preventDefault();up.classList.remove('over')}));
+up.addEventListener('drop',e=>load([...e.dataTransfer.files]));
+</script>
+</body>
+</html>
